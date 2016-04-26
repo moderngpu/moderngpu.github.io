@@ -5,7 +5,7 @@
         
         <meta charset="UTF-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-        <title>Patterns and specializers | moderngpu</title>
+        <title>Patterns and behaviors | moderngpu</title>
         <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
         <meta name="description" content="">
         <meta name="generator" content="GitBook 2.6.7">
@@ -42,7 +42,7 @@
     <link rel="next" href="../doc/lbs.html" />
     
     
-    <link rel="prev" href="../doc/kernels.html" />
+    <link rel="prev" href="../doc/gettingstarted.html" />
     
 
         
@@ -51,11 +51,11 @@
         
         
     <div class="book"
-        data-level="4"
-        data-chapter-title="Patterns and specializers"
+        data-level="3"
+        data-chapter-title="Patterns and behaviors"
         data-filepath="doc/patterns.md"
         data-basepath=".."
-        data-revision="Mon Apr 25 2016 08:43:28 GMT-0400 (EDT)"
+        data-revision="Tue Apr 26 2016 00:05:24 GMT-0400 (EDT)"
         data-innerlanguage="">
     
 
@@ -114,44 +114,29 @@
             
         </li>
     
-        <li class="chapter " data-level="3" data-path="doc/kernels.html">
-            
-                
-                    <a href="../doc/kernels.html">
-                
-                        <i class="fa fa-check"></i>
-                        
-                            <b>3.</b>
-                        
-                        Kernels and arguments
-                    </a>
-            
-            
-        </li>
-    
-        <li class="chapter active" data-level="4" data-path="doc/patterns.html">
+        <li class="chapter active" data-level="3" data-path="doc/patterns.html">
             
                 
                     <a href="../doc/patterns.html">
                 
                         <i class="fa fa-check"></i>
                         
-                            <b>4.</b>
+                            <b>3.</b>
                         
-                        Patterns and specializers
+                        Patterns and behaviors
                     </a>
             
             
         </li>
     
-        <li class="chapter " data-level="5" data-path="doc/lbs.html">
+        <li class="chapter " data-level="4" data-path="doc/lbs.html">
             
                 
                     <a href="../doc/lbs.html">
                 
                         <i class="fa fa-check"></i>
                         
-                            <b>5.</b>
+                            <b>4.</b>
                         
                         Load-balancing search
                     </a>
@@ -159,14 +144,14 @@
             
         </li>
     
-        <li class="chapter " data-level="6" data-path="doc/api.html">
+        <li class="chapter " data-level="5" data-path="doc/api.html">
             
                 
                     <a href="../doc/api.html">
                 
                         <i class="fa fa-check"></i>
                         
-                            <b>6.</b>
+                            <b>5.</b>
                         
                         API reference
                     </a>
@@ -174,14 +159,14 @@
             
         </li>
     
-        <li class="chapter " data-level="7" data-path="doc/usage.html">
+        <li class="chapter " data-level="6" data-path="doc/usage.html">
             
                 
                     <a href="../doc/usage.html">
                 
                         <i class="fa fa-check"></i>
                         
-                            <b>7.</b>
+                            <b>6.</b>
                         
                         Usage notes
                     </a>
@@ -189,14 +174,14 @@
             
         </li>
     
-        <li class="chapter " data-level="8" data-path="LICENSE.html">
+        <li class="chapter " data-level="7" data-path="LICENSE.html">
             
                 
                     <a href="../LICENSE.html">
                 
                         <i class="fa fa-check"></i>
                         
-                            <b>8.</b>
+                            <b>7.</b>
                         
                         License
                     </a>
@@ -204,14 +189,14 @@
             
         </li>
     
-        <li class="chapter " data-level="9" data-path="doc/moderngpu_1.0.html">
+        <li class="chapter " data-level="8" data-path="doc/moderngpu_1.0.html">
             
                 
                     <a href="../doc/moderngpu_1.0.html">
                 
                         <i class="fa fa-check"></i>
                         
-                            <b>9.</b>
+                            <b>8.</b>
                         
                         moderngpu 1.0
                     </a>
@@ -253,206 +238,233 @@
                     <section class="normal" id="section-">
                     
                         <h1 id="patterns-and-behaviors">Patterns and behaviors</h1>
-<p>moderngpu exposes functionality through templated <em>pattern</em> functions. The user specializes these patterns with concrete <em>behavior</em> functions, typically written as C++ lambdas. The pattern launches a kernel, computes a <em>context</em> for each work-item, and invokes the behavior on each work-item, providing the corresponding context.</p>
-<p>Each pattern works with its arguments to define a deterministic <em>network</em> of operations. A simple pattern like <a href="#transform"><code>transform</code></a> has a simple network: it maps the global ID of each thread to the <code>index</code> argument of the provided behavior. </p>
-<h2 id="highlevel-patterns">High-level patterns</h2>
-<p><a href="#transform_reduce"><code>transform_reduce</code></a> defines a more complicated network, calling the user&apos;s reduction operator recursively on the results of reduced tiles of inputs. The structure of the network is determined by the count of the reduction but is independent of the user-supplied behaviors.</p>
-<p><a href="#transform_lbs"><code>transform_lbs</code></a> is an advanced pattern. By using dynamic searches it provides the behavior function with critical context (the segment and rank of the work-item within the segment) for each work-item while load-balancing work-items across the GPU. This network, while still deterministic, changes structure with the user&apos;s choice of segmentation.</p>
-<h2 id="defining-behaviors">Defining behaviors</h2>
-<p>The simplest pattern is <code>mgpu::transform</code>.</p>
-<p><strong><code>transform.hxx</code></strong></p>
-<pre><code class="lang-cpp"><span class="hljs-keyword">template</span>&lt;
-  <span class="hljs-keyword">int</span> nt = <span class="hljs-number">128</span>,         <span class="hljs-comment">// Number of threads in the thread block.</span>
-  <span class="hljs-keyword">int</span> vt = <span class="hljs-number">1</span>,           <span class="hljs-comment">// Grain size for each thread.</span>
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">func_t</span>,      <span class="hljs-comment">// Function called for each work-item.</span>
-  <span class="hljs-keyword">typename</span>... <span class="hljs-keyword">args_t</span>    <span class="hljs-comment">// Auxiliary arguments.</span>
-&gt;
-<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">transform</span><span class="hljs-params">(func_t f, size_t count, context_t&amp; context, args_t... args)</span></span>;
+<p>moderngpu exposes functionality through templated <em>pattern</em> functions. The user specializes these patterns with concrete <em>behaviors</em>, typically written as C++ lambdas. The pattern launches a kernel, computes a <em>context</em> for each work-item, and invokes the behavior on each work-item, providing the corresponding context.</p>
+<p>moderngpu provides patterns useful for many operations:</p>
+<ol>
+<li><strong>cta_launch</strong> - Launch a grid of cooperative thread arrays (CTAs) and pass the behavior function the index of the thread (threadIdx.x) and CTA (blockIdx.x).</li>
+<li><strong>cta_transform</strong> - Launch a grid of CTAs, but size them according to the number of work-items that can be processed given the architecture&apos;s specified <em>launch box</em>.</li>
+<li><strong>transform</strong> - A non-cooperative method. Invoke the behavior once for each work-item.</li>
+<li><strong>transform_reduce</strong> - Call a behavior once for each work-item and recursively reduce the return values with a user-provided reducer. This pattern enables array-wide sum, max, and min operations.</li>
+<li><strong>transform_scan</strong> - Like <code>transform_reduce</code>, but computes a reduction for each interval from the start of the array to each element. For an addition operator this is the <a href="https://en.wikipedia.org/wiki/Prefix_sum" target="_blank">prefix sum</a> operation. </li>
+<li><strong>transform_lbs</strong> - A vectorized and load-balanced <code>transform</code> implemented using <em>load-balancing search</em>. The caller specifies the geometry of the problem with a segments descriptor array and the behavior is invoked for each work-item, providing both the ID of the segment the work-item belongs to and its rank within the segment. This is the signature pattern of moderngpu.</li>
+<li><strong>lbs_segreduce</strong> - Fold together all values in each segment and return one reduction value per segment. The behavior is invoked with the segment ID and rank of each work-item. This pattern makes for consistent performance for simultaneous processing of many irregularly-shaped problems.</li>
+<li><strong>transform_compact</strong> - An efficient two-pass pattern for conditionally selecting and compacting elements of an array.</li>
+<li><strong>lbs_workcreate</strong> - Dynamic work-creation accelerated with load-balancing search. This is a two-pass pattern. On the upsweep the pattern returns the number of output work-items to stream for each input work-item. On the downsweep, the pattern encodes parameters for each work-creating segment. This pattern solves many problems that CUDA Dynamic Parallelism was intended to solve, but with exact load-balancing and requiring no special hardware mechanisms.</li>
+</ol>
+<p>moderngpu also includes traditional bulk-synchronous parallel general-purpose functions. Most of these can be adapted to the pattern-behavior model with the use of <em>lambda iterators</em>, which wrap lambda behavior functions in the interface of pointers.</p>
+<ul>
+<li><strong>reduce</strong> and <strong>scan</strong> are the iterator-oriented equivalents of <code>transform_reduce</code> and <code>transform_scan</code>.</li>
+<li><strong>merge</strong>, <strong>bulk_remove</strong> and <strong>bulk_insert</strong> are general-purpose array construction functions.</li>
+<li><strong>mergesort</strong> is a basic array-wide sort. <strong>segmented_sort</strong> is an advanced mergesort that sorts keys and values within segments defined by a segments descriptor array. Thanks to a novel short-circuiting feature, <code>segmented_sort</code> actually improves in performance as the number of segments to sort increases.</li>
+<li><strong>sorted_search</strong> is a vectorized sorted search. A binary search looks for a needle in a sorted haystack. The vectorized sorted search looks for an array of sorted needles in a sorted haystack. A problem with <em>n</em> needles and <em>m</em> haystack items requires _O(n log m) operations to binary search but only _O(n + m) operations to sorted search. This is a critical function for implementing database operations.</li>
+<li><strong>inner_join</strong> is a relational join operator. It&apos;s a demonstration of the power of combining vectorized sorted search with the load-balancing search and useful in its own right.</li>
+</ul>
+<h2 id="patterns-and-arguments">Patterns and arguments</h2>
+<p><strong>no_capture.cu</strong></p>
+<pre><code class="lang-cpp"><span class="hljs-preprocessor">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;moderngpu/transform.hxx&gt;</span></span>
+
+<span class="hljs-keyword">using</span> <span class="hljs-keyword">namespace</span> mgpu;
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">(<span class="hljs-keyword">int</span> argc, <span class="hljs-keyword">char</span>** argv)</span> </span>{
+  <span class="hljs-keyword">standard_context_t</span> context;
+
+  transform([]MGPU_DEVICE(<span class="hljs-keyword">int</span> index) {
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Hello from thread %d\n&quot;</span>, index);
+  }, <span class="hljs-number">10</span>, context);
+  context.synchronize();
+
+  <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
 </code></pre>
-<p>The user provides a behavior functor or lambda implementing <code>void operator()(int index)</code>. This behavior is invoked once per work-item, which range from 0 to <code>count</code>. This is a standard <em>map</em> pattern, and is included in every general--purpose CUDA library. </p>
-<h4 id="example">Example</h4>
-<p>The behavior uses C++ lambda closure to capture the arguments it needs from the surrounding scope. Lambdas must be tagged with <code>MGPU_DEVICE</code> (a macro for <code>__device__</code>) when they are created in host code and invoked on device code.</p>
-<pre><code class="lang-cpp"><span class="hljs-comment">// Square each element in x and store it into y.</span>
-<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">square_all</span><span class="hljs-params">(<span class="hljs-keyword">const</span> <span class="hljs-keyword">float</span>* x, <span class="hljs-keyword">int</span> count, <span class="hljs-keyword">float</span>* y, context_t&amp; context)</span> </span>{
-  <span class="hljs-keyword">auto</span> k = [=]MGPU_DEVICE(<span class="hljs-keyword">int</span> index) {
-    y[index] = x[index] * x[index];
+<pre><code>Hello from thread 0
+Hello from thread 1
+Hello from thread 2
+Hello from thread 3
+Hello from thread 4
+Hello from thread 5
+Hello from thread 6
+Hello from thread 7
+Hello from thread 8
+Hello from thread 9
+</code></pre><p>This simple example defines a behavior function which takes one argument and prints it to the console. It is combined with the <code>transform</code> pattern, which invokes it once on each of the 10 input work-items. The behavior is a device-tagged lambda. We must mark it with <code>MGPU_DEVICE</code> (or <code>__device__</code>) after the capture list <code>[]</code> and before the arguments list <code>(int index)</code>. Under CUDA 7.5 you must compile with <code>--expt-extended-lambda</code> to enable device-tagged lambdas.</p>
+<p><strong>lamdda_capture.cu</strong></p>
+<pre><code class="lang-cpp"><span class="hljs-preprocessor">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;moderngpu/transform.hxx&gt;</span></span>
+
+<span class="hljs-keyword">using</span> <span class="hljs-keyword">namespace</span> mgpu;
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">(<span class="hljs-keyword">int</span> argc, <span class="hljs-keyword">char</span>** argv)</span> </span>{
+  <span class="hljs-keyword">standard_context_t</span> context;
+
+  <span class="hljs-comment">// Define an exponential argument on the host.</span>
+  <span class="hljs-keyword">float</span> a = <span class="hljs-number">22.102</span>, b = <span class="hljs-number">1.815f</span>;
+
+  <span class="hljs-comment">// Allocate device memory.</span>
+  <span class="hljs-keyword">int</span> count = <span class="hljs-number">1000</span>;
+  <span class="hljs-keyword">float</span>* output;
+  cudaMalloc((<span class="hljs-keyword">void</span>**)&amp;output, <span class="hljs-keyword">sizeof</span>(<span class="hljs-keyword">float</span>) * count);
+
+  transform([=]MGPU_DEVICE(<span class="hljs-keyword">int</span> index) {
+    output[index] = <span class="hljs-function">a * <span class="hljs-title">exp</span><span class="hljs-params">(b * index)</span></span>;
+  }, count, context);
+
+  <span class="hljs-comment">// Do something with the output.</span>
+  <span class="hljs-comment">// xxx</span>
+
+  cudaFree(output);
+  <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>This example computes <code>a * exp(b * index)</code> into device memory for 1000 indices. It uses lambda closure to capture three arguments from the host: coefficients <code>a</code> and <code>b</code> and the pointer to device memory <code>output</code>. Use the capture list <code>[=]</code> to capture any arguments from the host by value. Because host and device codes reside in different address spaces, arguments cannot be captured (or passed) by reference.</p>
+<h2 id="variadic-arguments">Variadic arguments</h2>
+<p>Lambda capture is the most convenient but not the only way to pass arguments from the host into kernels. </p>
+<p><strong>variadic_parameters.cu</strong></p>
+<pre><code class="lang-cpp"><span class="hljs-preprocessor">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;moderngpu/transform.hxx&gt;</span></span>
+
+<span class="hljs-keyword">using</span> <span class="hljs-keyword">namespace</span> mgpu;
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">(<span class="hljs-keyword">int</span> argc, <span class="hljs-keyword">char</span>** argv)</span> </span>{
+  <span class="hljs-keyword">standard_context_t</span> context;
+
+  <span class="hljs-keyword">typedef</span> <span class="hljs-keyword">launch_params_t</span>&lt;<span class="hljs-number">128</span>, <span class="hljs-number">16</span>&gt; <span class="hljs-keyword">launch_t</span>;
+
+  <span class="hljs-comment">// Define the behavior function. It takes an int* pointer </span>
+  <span class="hljs-comment">// after the required (tid, cta) indices. This pointer will</span>
+  <span class="hljs-comment">// be passed as the last argument to cta_launch.</span>
+  <span class="hljs-keyword">auto</span> f = [=]MGPU_DEVICE(<span class="hljs-keyword">int</span> tid, <span class="hljs-keyword">int</span> cta, <span class="hljs-keyword">int</span>* cta_temp) {
+    <span class="hljs-comment">// Each CTA does something special on cta_temp.</span>
+    <span class="hljs-keyword">if</span>(!tid) cta_temp[cta] = cta;
   };
-  transform(k, count, context);
+
+  <span class="hljs-comment">// Compute occupancy.</span>
+  <span class="hljs-keyword">int</span> occ = occupancy&lt;<span class="hljs-keyword">launch_t</span>&gt;(f, context, (<span class="hljs-keyword">int</span>*)<span class="hljs-literal">nullptr</span>);
+
+  <span class="hljs-comment">// Allocate one item per CTA.</span>
+  <span class="hljs-keyword">mem_t</span>&lt;<span class="hljs-keyword">int</span>&gt; cta_temp(occ, context);
+
+  <span class="hljs-comment">// Invoke the pattern and pass it the cta_temp pointer variadically. </span>
+  cta_launch&lt;<span class="hljs-keyword">launch_t</span>&gt;(
+    f,                 <span class="hljs-comment">// Handle of the behavior function.</span>
+    occ,               <span class="hljs-comment">// Number of CTAs to launch.</span>
+    context,           <span class="hljs-comment">// Reference to context object. Holds the stream.</span>
+    cta_temp.data()    <span class="hljs-comment">// Parameters to pass to the behavior.</span>
+  );
+
+  <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
 }
 </code></pre>
-<p>For compactness we can also define the behavior lambda without assigning it to a variable.</p>
-<pre><code class="lang-cpp"><span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">square_all</span><span class="hljs-params">(<span class="hljs-keyword">const</span> <span class="hljs-keyword">float</span>* x, <span class="hljs-keyword">int</span> count, <span class="hljs-keyword">float</span>* y, context_t&amp; context)</span> </span>{
-  transform([=]MGPU_DEVICE(<span class="hljs-keyword">int</span> index) {
-    y[index] = x[index] * x[index];
-  }, count, context);
-}
+<p>Most patterns support passing additional arguments to the behavior function variadically. These parameters are passed at the end of patterns like <code>transform</code>, <code>cta_launch</code> and <code>transform_lbs</code>, copied to the device, and passed again to the behavior function on the device side. </p>
+<p>Why provide this second mechanism of parameter passing? Sometimes lambda capture cannot be used. <em>Occupancy</em> is the maximum number of CTAs that can be executed concurrently on the device. The occupancy of a kernel depends on the definition of that kernel, as different kernels use different amounts of SM resources, which are only available in finite quantities. </p>
+<p>Let&apos;s say we want to allocate memory based on occupancy and pass this memory into a kernel. We need to define the kernel to compute the occupancy, then allocate memory given the occupancy, then pass the allocated memory into the kernel. This isn&apos;t possible with lambda capture, as the pointer to this allocated memory needs to be available for the lambda definition, on which the occupancy calculator depends.</p>
+<p>Although this is a fair motivating case for the use of variadic parameters, in some cases they have a tremendous advantage over captured parameters. </p>
+<h2 id="restricted-arguments">Restricted arguments</h2>
+<p>Parameters that are passed by lambda captured are handled directly by the CUDA compiler; moderngpu doesn&apos;t get its hands on those. Parameters passed variadically, however, are available for transformation by the library.</p>
+<p>moderngpu tags all pointer-type variadic pattern arguments with the <strong>__restrict__</strong> qualifier. __restrict__ is an assertion by the programmer that all qualified pointers reference non-overlapping memory, that is, the pointers are not <em>aliased</em>. When pointers are aliased, the compiler issues cannot re-order store instructions, and this leads to sequential dependencies which may increase latency. </p>
+<p>By tagging all pointers with __restrict__, the compiler can <em>overlap</em> loads by factoring them to the top, issuing each load before the preceding one has returned its data. Overlapping of IO increases <em>instruction-level parallelism</em> (ILP) and decreases kernel latency. </p>
+<p>In this example we call the <code>transform</code> pattern with a block size of 128 threads and a grain size of 4. That is, for a full block, 4 work-items are processed per thread. Using a large grain size opens the possibility for scheduling overlapped loads and realizing high ILP. </p>
+<pre><code class="lang-cpp">  <span class="hljs-comment">// Pass by capture.</span>
+  transform&lt;<span class="hljs-number">128</span>, <span class="hljs-number">4</span>&gt;([=]MGPU_DEVICE(<span class="hljs-keyword">int</span> index) {
+    output[index] = <span class="hljs-number">2</span> * input[index];
+  }, <span class="hljs-number">0</span>, context);
 </code></pre>
-<p><code>transform</code> has a trivial implementation but is nonetheless helpful. It simply launches one thread per work-item and passes </p>
-<pre><code class="lang-cpp">index = threadIdx.x + blockDim.x * blockIdx.x
+<pre><code>/*01b0*/               LDG.E R0, [R2];                      /* 0xeed4200000070200 */
+/*01b8*/               SHL R6, R0, 0x1;                     /* 0x3848000000170006 */
+                                                            /* 0x011fc8000e4001f2 */
+/*01c8*/               STG.E [R4], R6;                      /* 0xeedc200000070406 */
+/*01d0*/               LDG.E R0, [R2+0x200];                /* 0xeed4200020070200 */
+/*01d8*/               SHL R7, R0, 0x1;                     /* 0x3848000000170007 */
+                                                            /* 0x011f88000e4001f2 */
+/*01e8*/               STG.E [R4+0x200], R7;                /* 0xeedc200020070407 */
+/*01f0*/               LDG.E R0, [R2+0x400];                /* 0xeed4200040070200 */
+/*01f8*/               SHL R9, R0, 0x1;                     /* 0x3848000000170009 */
+                                                            /* 0x011fc8000e4001f2 */
+/*0208*/               STG.E [R4+0x400], R9;                /* 0xeedc200040070409 */
+/*0210*/               LDG.E R0, [R2+0x600];                /* 0xeed4200060070200 */
+/*0218*/               SHL R10, R0, 0x1;                    /* 0x384800000017000a */
+                                                            /* 0x001ffc00ffe001f1 */
+/*0228*/               STG.E [R4+0x600], R10;               /* 0xeedc20006007040a */
+</code></pre><p>In the first usage of <code>transform</code>, the input and output pointers are passed by lambda capture. The moderngpu library has no chance to tag these with the __restrict__ qualifier, and so the compiler assumes pointer aliasing and evaluates the behavior function four times in sequence. The SM waits hundreds of cycles for each LDG instruction to return data, so it can shift it and store it back out. Unless occupancy is high, kernels with sequential load/store pairs are very often latency limited.</p>
+<pre><code class="lang-cpp">  <span class="hljs-comment">// Pass by argument. Pointers are treated as restricted.</span>
+  transform&lt;<span class="hljs-number">128</span>, <span class="hljs-number">4</span>&gt;([]MGPU_DEVICE(<span class="hljs-keyword">int</span> index, <span class="hljs-keyword">const</span> <span class="hljs-keyword">int</span>* input, <span class="hljs-keyword">int</span>* output) {
+    output[index] = <span class="hljs-number">2</span> * input[index];
+  }, <span class="hljs-number">0</span>, context, input, output);
 </code></pre>
-<p>to the behavior function. </p>
-<h4 id="example">Example</h4>
-<p>Consider a conversion from AOS (array of struct) to SOA (struct of array). We use the <em>transform</em> pattern to invoke the <em>behavior</em> for each element. The behavior simply constructs a struct on the four array elements and stores it to the result array.</p>
-<pre><code class="lang-cpp"><span class="hljs-keyword">struct</span> <span class="hljs-keyword">vec_t</span> {
-  <span class="hljs-keyword">float</span> x, y, z, w;
-};
-<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">arrays_to_struct</span><span class="hljs-params">(<span class="hljs-keyword">const</span> <span class="hljs-keyword">float</span>* x, <span class="hljs-keyword">const</span> <span class="hljs-keyword">float</span>* y, <span class="hljs-keyword">const</span> <span class="hljs-keyword">float</span>* z, 
-  <span class="hljs-keyword">const</span> <span class="hljs-keyword">float</span>* w, <span class="hljs-keyword">int</span> count, vec_t* v, context_t&amp; context)</span> </span>{
-  transform([=]MGPU_DEVICE(<span class="hljs-keyword">int</span> index) {
-    v[index] = <span class="hljs-keyword">vec_t</span> { x[index], y[index], z[index], w[index] };
-  }, count, context);
-}
-</code></pre>
-<p>This behavior seems straight-forward, but we can use it with almost every pattern, providing an ability to specialize very complicated kernels with little effort and perfect clarity.</p>
-<h2 id="transformreduce">transform_reduce</h2>
-<p><em>Reduction</em> is the next pattern that all CUDA libraries implement. This one contains some logic--a network that adds together all inputs in parallel. <code>mgpu::reduce</code> is specialized on two behaviors: a function that, given an index, returns the value of the item to be reduced; and a function that reduces two argument values into one.</p>
-<p><strong><code>kernel_reduce.hxx</code></strong></p>
-<pre><code class="lang-cpp"><span class="hljs-keyword">template</span>&lt;
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">launch_arg_t</span> = <span class="hljs-keyword">empty_t</span>,  <span class="hljs-comment">// optional launch_box overrides default.</span>
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">func_t</span>,         <span class="hljs-comment">// implements type_t operator()(int index).</span>
-  <span class="hljs-keyword">typename</span> output_it,      <span class="hljs-comment">// iterator to output. one output element.</span>
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">op_t</span>            <span class="hljs-comment">// reduction operator implements</span>
-                           <span class="hljs-comment">//   type_t operator()(type_t left, type_t right).</span>
-&gt;
-<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">transform_reduce</span><span class="hljs-params">(func_t f, <span class="hljs-keyword">int</span> count, output_it reduction, op_t op, 
-  context_t&amp; context)</span></span>;
-</code></pre>
-<h4 id="example">Example</h4>
-<p>This sample shows both behaviors for reduce. The <em>transform</em> behavior returns the value to be reduced given an index. In this case, the product of an element from <code>a</code> with an element from <code>b</code>. The <em>reducer</em> behavior folds together two argument values. In this case it returns the sum. The final scalar reduction is stored into <code>c</code>.</p>
-<pre><code class="lang-cpp"><span class="hljs-comment">// Add up the element-wise products of a and b and store into c.</span>
-<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">dot_product</span><span class="hljs-params">(<span class="hljs-keyword">const</span> <span class="hljs-keyword">float</span>* a, <span class="hljs-keyword">const</span> <span class="hljs-keyword">float</span>* b, <span class="hljs-keyword">float</span>* c, <span class="hljs-keyword">int</span> count,
+<pre><code>/*01b0*/               LDG.E.CI R6, [R2];                   /* 0xeed4a00000070206 */
+/*01b8*/               LDG.E.CI R0, [R2+0x200];             /* 0xeed4a00020070200 */
+                                                            /* 0x011fc800162000b1 */
+/*01c8*/               LDG.E.CI R7, [R2+0x400];             /* 0xeed4a00040070207 */
+/*01d0*/               LDG.E.CI R8, [R2+0x600];             /* 0xeed4a00060070208 */
+/*01d8*/               SHL R6, R6, 0x1;                     /* 0x3848000000170606 */
+                                                            /* 0x041fc0003e4087f0 */
+/*01e8*/     {         SHL R9, R0, 0x1;                     /* 0x3848000000170009 */
+/*01f0*/               STG.E [R4], R6;        }             /* 0xeedc200000070406 */
+/*01f8*/     {         SHL R10, R8, 0x1;                    /* 0x384800000017080a */
+/*0208*/               STG.E [R4+0x200], R9;        }       /* 0x0007c800fc4001f1 */
+                                                            /* 0xeedc200020070409 */
+/*0210*/               SHL R7, R7, 0x1;                     /* 0x3848000000170707 */
+/*0218*/               STG.E [R4+0x400], R7;                /* 0xeedc200040070407 */
+                                                            /* 0x001ffc00ffe001f1 */
+/*0228*/               STG.E [R4+0x600], R10;               /* 0xeedc20006007040a */
+</code></pre><p>The second usage of <code>transform</code> passes <code>input</code> and <code>output</code> into the <code>transform</code> pattern, and the pattern tags them with the __restrict__ qualifier passes them back to the lambda. Because a guarantee has been made that the pointers do not alias, the compiler factors the load instructions to the top, issuing all four at once. If a load takes 400 cycles, we now only wait for that duration once, rather than waiting for it four times sequentially.</p>
+<p>The use of restricted pointers may have downsides, but these are mostly hypothetical. Because more values are loaded before being stored back out, register pressure is higher and occupancy may suffer. Still, the increase in ILP almost certainly outweighs the slight loss in thread-level parallelism resulting from diminished occupancy.</p>
+<h2 id="restricted-arguments-with-advanced-patterns">Restricted arguments with advanced patterns</h2>
+<p><strong>interval_move</strong> is an advanced operation with a simple implementation. It&apos;s a simple behavior for the <em>load-balancing search</em> pattern <strong>transform_lbs</strong>, which performs a load-balanced and vectorized set of array copy operations. Each segment has a length specified by the segments descriptor array. Each segment also has a starting array in the output array (its <em>scatter</em> offset) starting offset in the input array (its <em>gather</em> offset). Because all work-items (i.e. elements to be copied) in each segment share the same scatter and gather offsets, and those offsets are encoded exactly once per segment, they can be loaded automatically in an optimized way by the load-balancing search pattern, bound together into a tuple, and passed to the behavior function. The behavior then adds the rank of the work-item (i.e. the offset of the element within the segment) to the segment&apos;s gather and scatter offsets and loads and stores to them, respectively.</p>
+<pre><code class="lang-cpp"><span class="hljs-keyword">template</span>&lt;<span class="hljs-keyword">typename</span> <span class="hljs-keyword">launch_arg_t</span> = <span class="hljs-keyword">empty_t</span>, 
+  <span class="hljs-keyword">typename</span> input_it, <span class="hljs-keyword">typename</span> segments_it, <span class="hljs-keyword">typename</span> scatter_it,
+  <span class="hljs-keyword">typename</span> gather_it, <span class="hljs-keyword">typename</span> output_it&gt;
+<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">interval_move1</span><span class="hljs-params">(input_it input, <span class="hljs-keyword">int</span> count, segments_it segments,
+  <span class="hljs-keyword">int</span> num_segments, scatter_it scatter, gather_it gather, output_it output, 
   context_t&amp; context)</span> </span>{
-  <span class="hljs-keyword">auto</span> transformer = [=]MGPU_DEVICE(<span class="hljs-keyword">int</span> index) {
-    <span class="hljs-keyword">return</span> a[index] * b[index];
-  };
-  <span class="hljs-keyword">auto</span> reducer = []MGPU_DEVICE(<span class="hljs-keyword">float</span> lhs, <span class="hljs-keyword">float</span> rhs) -&gt; <span class="hljs-keyword">float</span> {
-    <span class="hljs-keyword">return</span> lhs + rhs;
-  };
-  reduce(transformer, count, c, reducer, context);
+
+  transform_lbs&lt;<span class="hljs-keyword">launch_arg_t</span>&gt;(
+    [=]MGPU_DEVICE(<span class="hljs-keyword">int</span> index, <span class="hljs-keyword">int</span> seg, <span class="hljs-keyword">int</span> rank, tuple&lt;<span class="hljs-keyword">int</span>, <span class="hljs-keyword">int</span>&gt; desc) {
+      output[get&lt;<span class="hljs-number">0</span>&gt;(desc) + rank] = input[get&lt;<span class="hljs-number">1</span>&gt;(desc) + rank];
+    }, 
+    count, segments, num_segments, make_tuple(scatter, gather), context
+  );
 }
 </code></pre>
-<p>Addition is a very common reducer, so a <em>functor</em> type <code>mgpu::plus_t&lt;&gt;</code> is defined as a convenience. <code>multiplies_t&lt;&gt;</code>, <code>maximum_t&lt;&gt;</code> and <code>minimum_t&lt;&gt;</code> are also provided in <strong><code>operators.hxx</code></strong> for use with <code>reduce</code>. </p>
-<pre><code class="lang-cpp"><span class="hljs-comment">// Add up the element-wise products of a and b and store into c.</span>
-<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">dot_product</span><span class="hljs-params">(<span class="hljs-keyword">const</span> <span class="hljs-keyword">float</span>* a, <span class="hljs-keyword">const</span> <span class="hljs-keyword">float</span>* b, <span class="hljs-keyword">float</span>* c, <span class="hljs-keyword">int</span> count,
+<pre><code>/*13d0*/                   LDG.E R0, [R16];                 /* 0xeed4200000071000 */
+/*13d8*/                   STG.E [R6], R0;                  /* 0xeedc200000070600 */
+                                                            /* 0x0012c8087e400272 */
+/*13e8*/                   LDG.E R2, [R18];                 /* 0xeed4200000071202 */
+/*13f0*/                   STG.E [R8], R2;                  /* 0xeedc200000070802 */
+/*13f8*/                   LDG.E R3, [R10];                 /* 0xeed4200000070a03 */
+                                                            /* 0x0403c420164105fd */
+/*1408*/                   STG.E [R4], R3;                  /* 0xeedc200000070403 */
+/*1410*/                   LDG.E R12, [R12];                /* 0xeed4200000070c0c */
+/*1418*/                   STG.E [R14], R12;                /* 0xeedc200000070e0c */
+</code></pre><p>Because of the expressiveness of <code>transform_lbs</code>, the interval move function is implemented with a one-line behavior. This version uses lambda capture to access the input and output pointers. Although the results of this function are undefined when the input and output pointers reference overlapping memory (it would have to be written very carefully to give deterministic results), the compiler still generates code assuming pointer aliasing rules apply. Using a grain size of four, we see the four load/store pairs in the program&apos;s disassembly. This is still good code generation--much logic has been factored away from the IO and hoisted to the top of the code. But still, this sequence generates unnecessary dependencies, and the function will not perform as well as it could.</p>
+<pre><code class="lang-cpp"><span class="hljs-keyword">template</span>&lt;<span class="hljs-keyword">typename</span> <span class="hljs-keyword">launch_arg_t</span> = <span class="hljs-keyword">empty_t</span>, 
+  <span class="hljs-keyword">typename</span> input_it, <span class="hljs-keyword">typename</span> segments_it, <span class="hljs-keyword">typename</span> scatter_it,
+  <span class="hljs-keyword">typename</span> gather_it, <span class="hljs-keyword">typename</span> output_it&gt;
+<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">interval_move2</span><span class="hljs-params">(input_it input, <span class="hljs-keyword">int</span> count, segments_it segments,
+  <span class="hljs-keyword">int</span> num_segments, scatter_it scatter, gather_it gather, output_it output, 
   context_t&amp; context)</span> </span>{
-  reduce([=]MGPU_DEVICE(<span class="hljs-keyword">int</span> index) {
-    <span class="hljs-keyword">return</span> a[index] * b[index];
-  }, count, c, <span class="hljs-keyword">plus_t</span>&lt;<span class="hljs-keyword">float</span>&gt;(), context);
+
+  transform_lbs&lt;<span class="hljs-keyword">launch_arg_t</span>&gt;(
+    []MGPU_DEVICE(<span class="hljs-keyword">int</span> index, <span class="hljs-keyword">int</span> seg, <span class="hljs-keyword">int</span> rank, tuple&lt;<span class="hljs-keyword">int</span>, <span class="hljs-keyword">int</span>&gt; desc,
+      input_it input, output_it output) {
+      output[get&lt;<span class="hljs-number">0</span>&gt;(desc) + rank] = input[get&lt;<span class="hljs-number">1</span>&gt;(desc) + rank];
+    }, 
+    count, segments, num_segments, make_tuple(scatter, gather), context,
+    input, output
+  );
 }
 </code></pre>
-<h2 id="transformscan">transform_scan</h2>
-<h2 id="transformsegreduce">transform_segreduce</h2>
-<p>Many libraries have a form of segmented reduction pattern, but nothing else provides as much for general segmented algorithms as moderngpu. </p>
-<p><strong><code>kernel_segreduce.hxx</code></strong></p>
-<pre><code class="lang-cpp"><span class="hljs-keyword">template</span>&lt;
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">launch_arg_t</span> = <span class="hljs-keyword">empty_t</span>, <span class="hljs-comment">// provides constants (nt, vt, vt0).</span>
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">func_t</span>,         <span class="hljs-comment">// implements type_t operator()(int index).</span>
-  <span class="hljs-keyword">typename</span> segments_it,    <span class="hljs-comment">// segments-descriptor array.</span>
-                           <span class="hljs-comment">//   specificies starting offset of each segment.</span>
-  <span class="hljs-keyword">typename</span> output_it,      <span class="hljs-comment">// output iterator. one output per segment.</span>
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">op_t</span>,           <span class="hljs-comment">// reduction operator implements</span>
-                           <span class="hljs-comment">//   type_t operator()(type_t a, type_t b)</span>
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">type_t</span>
-&gt;
-<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">transform_segreduce</span><span class="hljs-params">(func_t f, <span class="hljs-keyword">int</span> count, segments_it segments, 
-  <span class="hljs-keyword">int</span> num_segments, output_it output, op_t op, type_t init, 
-  context_t&amp; context)</span></span>;
-</code></pre>
-<h2 id="transformlbs">transform_lbs</h2>
-<p><strong><code>kernel_load_balance.hxx</code></strong></p>
-<pre><code class="lang-cpp"><span class="hljs-keyword">template</span>&lt;
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">launch_arg_t</span> = <span class="hljs-keyword">empty_t</span>, <span class="hljs-comment">// provides (nt, vt, vt0)</span>
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">func_t</span>,         <span class="hljs-comment">// load-balancing search callback implements</span>
-                           <span class="hljs-comment">//   void operator()(int index,   // work-item</span>
-                           <span class="hljs-comment">//                   int seg,     // segment ID</span>
-                           <span class="hljs-comment">//                   int rank,    // rank within seg</span>
-                           <span class="hljs-comment">//                   tuple&lt;...&gt; cached_values).</span>
-  <span class="hljs-keyword">typename</span> segments_it,    <span class="hljs-comment">// segments-descriptor array.</span>
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">tpl_t</span>           <span class="hljs-comment">// tuple&lt;&gt; of iterators for caching loads.</span>
-&gt;
-<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">transform_lbs</span><span class="hljs-params">(func_t f, <span class="hljs-keyword">int</span> count, segments_it segments, 
-  <span class="hljs-keyword">int</span> num_segments, tpl_t caching_iterators, context_t&amp; context)</span></span>;
-
-<span class="hljs-comment">// version of transform_lbs without caching iterators</span>
-<span class="hljs-keyword">template</span>&lt;
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">launch_arg_t</span> = <span class="hljs-keyword">empty_t</span>, 
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">func_t</span>,         <span class="hljs-comment">// load-balancing search callback implements</span>
-                           <span class="hljs-comment">//   void operator()(int index, int seg, int rank).</span>
-  <span class="hljs-keyword">typename</span> segments_it
-&gt;
-<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">transform_lbs</span><span class="hljs-params">(func_t f, <span class="hljs-keyword">int</span> count, segments_it segments, 
-  <span class="hljs-keyword">int</span> num_segments, context_t&amp; context)</span></span>;
-</code></pre>
-<h2 id="lbssegreduce">lbs_segreduce</h2>
-<p><strong><code>kernel_segreduce.hxx</code></strong></p>
-<pre><code class="lang-cpp"><span class="hljs-keyword">template</span>&lt;
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">launch_arg_t</span> = <span class="hljs-keyword">empty_t</span>, <span class="hljs-comment">// provides (nt, vt, vt0)</span>
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">func_t</span>,         <span class="hljs-comment">// load-balancing search callback implements</span>
-                           <span class="hljs-comment">//   type_t operator()(int index,   // work-item</span>
-                           <span class="hljs-comment">//                     int seg,     // segment ID</span>
-                           <span class="hljs-comment">//                     int rank,    // rank within seg</span>
-                           <span class="hljs-comment">//                     tuple&lt;...&gt; cached_values).</span>
-  <span class="hljs-keyword">typename</span> segments_it,    <span class="hljs-comment">// segments-descriptor array.</span>
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">tpl_t</span>,          <span class="hljs-comment">// tuple&lt;&gt; of iterators for caching loads.</span>
-  <span class="hljs-keyword">typename</span> output_it,      <span class="hljs-comment">// output iterator. one output per segment.</span>
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">op_t</span>,           <span class="hljs-comment">// reduction operator implements</span>
-                           <span class="hljs-comment">//   type_t operator()(type_t a, type_t b).</span>
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">type_t</span>
-&gt;
-<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">lbs_segreduce</span><span class="hljs-params">(func_t f, <span class="hljs-keyword">int</span> count, segments_it segments,
-  <span class="hljs-keyword">int</span> num_segments, tpl_t caching_iterators, output_it output, op_t op,
-  type_t init, context_t&amp; context)</span></span>;
-
-<span class="hljs-comment">// version of lbs_segreduce without caching iterators.</span>
-<span class="hljs-keyword">template</span>&lt;
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">launch_arg_t</span> = <span class="hljs-keyword">empty_t</span>, 
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">func_t</span>,         <span class="hljs-comment">// load-balancing search callback implements</span>
-                           <span class="hljs-comment">//   type_t operator()(int index, int seg, int rank).</span>
-  <span class="hljs-keyword">typename</span> segments_it, 
-  <span class="hljs-keyword">typename</span> output_it, 
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">op_t</span>,
-  <span class="hljs-keyword">typename</span> <span class="hljs-keyword">type_t</span>
-&gt;
-<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">lbs_segreduce</span><span class="hljs-params">(func_t f, <span class="hljs-keyword">int</span> count, segments_it segments,
-  <span class="hljs-keyword">int</span> num_segments, output_it output, op_t op, type_t init, 
-  context_t&amp; context)</span></span>;
-</code></pre>
-<pre><code class="lang-cpp"><span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">segmented_stddev</span><span class="hljs-params">(<span class="hljs-keyword">const</span> <span class="hljs-keyword">float</span>* x, <span class="hljs-keyword">int</span> count, <span class="hljs-keyword">const</span> <span class="hljs-keyword">int</span>* segments,
-  <span class="hljs-keyword">int</span> num_segments, <span class="hljs-keyword">float</span>* c, context_t&amp; context)</span> </span>{
-
-  <span class="hljs-comment">// Find the total value of each segment.</span>
-  <span class="hljs-keyword">mem_t</span>&lt;<span class="hljs-keyword">float</span>&gt; totals(num_segments, context);
-  segreduce(x, count, segments, num_segments, totals.data(), <span class="hljs-keyword">plus_t</span>&lt;<span class="hljs-keyword">float</span>&gt;(),
-    <span class="hljs-number">0.0f</span>, context);
-
-  <span class="hljs-comment">// Define an iterator that turns the segment total into the segment mean.</span>
-  <span class="hljs-keyword">float</span>* totals_data = totals.data();
-  <span class="hljs-keyword">auto</span> mean = make_load_iterator&lt;<span class="hljs-keyword">float</span>&gt;([=]MGPU_DEVICE(<span class="hljs-keyword">int</span> index) -&gt; <span class="hljs-keyword">float</span> {
-    <span class="hljs-keyword">float</span> total = totals_data[index];
-    <span class="hljs-keyword">int</span> size = segments[index + <span class="hljs-number">1</span>] - segments[index];
-    <span class="hljs-keyword">if</span>(size &gt; <span class="hljs-number">0</span>) total /= size;
-    <span class="hljs-keyword">return</span> total;
-  });
-
-  <span class="hljs-comment">// Find the sum of squared differences in each segment.</span>
-  <span class="hljs-comment">// We use a caching iterator to apply the segment size normalization once</span>
-  <span class="hljs-comment">// per CTA and to broadcast the result to each thread that needs the </span>
-  <span class="hljs-comment">// mean.</span>
-  lbs_segreduce([=]MGPU_DEVICE(<span class="hljs-keyword">int</span> index, <span class="hljs-keyword">int</span> seg, <span class="hljs-keyword">int</span> rank, tuple&lt;<span class="hljs-keyword">float</span>&gt; u) {
-    <span class="hljs-comment">// u is a tuple holding the mean of the segment.</span>
-    <span class="hljs-keyword">return</span> sq(x[index] - get&lt;<span class="hljs-number">0</span>&gt;(u));
-  }, count, segments, num_segments, make_tuple(mean), y, 
-    <span class="hljs-keyword">plus_t</span>&lt;<span class="hljs-keyword">float</span>&gt;(), <span class="hljs-number">0.0f</span>, context);
-
-  <span class="hljs-comment">// Divide the sum of squared differences by the size of each segment</span>
-  <span class="hljs-comment">// and sqrt for the standard deviation.</span>
-  transform([=]MGPU_DEVICE(<span class="hljs-keyword">int</span> index) {
-    <span class="hljs-keyword">int</span> size = segments[index + <span class="hljs-number">1</span>] - segments[index];
-    <span class="hljs-keyword">if</span>(size &gt; <span class="hljs-number">0</span>) y[index] = <span class="hljs-built_in">sqrt</span>(y[index] / size);
-  }, count, context);
-}
-</code></pre>
-<h2 id="debugging-kernels">Debugging kernels</h2>
+<pre><code>/*13d0*/                   LDG.E.CI R0, [R16];              /* 0xeed4a00000071000 */
+/*13d8*/                   LDG.E.CI R2, [R18];              /* 0xeed4a00000071202 */
+                                                            /* 0x010fc800162002b1 */
+/*13e8*/                   LDG.E.CI R3, [R10];              /* 0xeed4a00000070a03 */
+/*13f0*/                   LDG.E.CI R12, [R12];             /* 0xeed4a00000070c0c */
+/*13f8*/                   STG.E [R6], R0;                  /* 0xeedc200000070600 */
+                                                            /* 0x0003c800fe6084f1 */
+/*1408*/                   STG.E [R8], R2;                  /* 0xeedc200000070802 */
+/*1410*/                   DEPBAR.LE SB5, 0x1;              /* 0xf0f0000034170000 */
+/*1418*/                   STG.E [R4], R3;                  /* 0xeedc200000070403 */
+                                                            /* 0x001ffc00ffe100f1 */
+/*1428*/                   STG.E [R14], R12;                /* 0xeedc200000070e0c */
+</code></pre><p>This implementation differs only that the input and output parameters are passed variadically to <code>transform_lbs</code>. The compiler can now re-order the memory operations, which it does, overlapping all four loads to the input array.</p>
+<p>Always look for opportunities to overlap loads from global memory. The moderngpu patterns aggressively overlap for data generated and consumed internally, and the automatic __restrict__ promotion on variadically-passed pointer arguments allows behavior data to be similarly optimized.</p>
 
                     
                     </section>
@@ -463,7 +475,7 @@
         </div>
 
         
-        <a href="../doc/kernels.html" class="navigation navigation-prev " aria-label="Previous page: Kernels and arguments"><i class="fa fa-angle-left"></i></a>
+        <a href="../doc/gettingstarted.html" class="navigation navigation-prev " aria-label="Previous page: Getting started"><i class="fa fa-angle-left"></i></a>
         
         
         <a href="../doc/lbs.html" class="navigation navigation-next " aria-label="Next page: Load-balancing search"><i class="fa fa-angle-right"></i></a>
