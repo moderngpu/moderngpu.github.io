@@ -55,7 +55,7 @@
         data-chapter-title="Patterns and behaviors"
         data-filepath="doc/patterns.md"
         data-basepath=".."
-        data-revision="Tue Apr 26 2016 00:05:24 GMT-0400 (EDT)"
+        data-revision="Tue Apr 26 2016 00:13:48 GMT-0400 (EDT)"
         data-innerlanguage="">
     
 
@@ -357,7 +357,7 @@ Hello from thread 9
 <p>Let&apos;s say we want to allocate memory based on occupancy and pass this memory into a kernel. We need to define the kernel to compute the occupancy, then allocate memory given the occupancy, then pass the allocated memory into the kernel. This isn&apos;t possible with lambda capture, as the pointer to this allocated memory needs to be available for the lambda definition, on which the occupancy calculator depends.</p>
 <p>Although this is a fair motivating case for the use of variadic parameters, in some cases they have a tremendous advantage over captured parameters. </p>
 <h2 id="restricted-arguments">Restricted arguments</h2>
-<p>Parameters that are passed by lambda captured are handled directly by the CUDA compiler; moderngpu doesn&apos;t get its hands on those. Parameters passed variadically, however, are available for transformation by the library.</p>
+<p>Parameters that are passed by lambda capture are handled directly by the CUDA compiler; moderngpu doesn&apos;t get its hands on those. Parameters passed variadically, however, are available for transformation by the library.</p>
 <p>moderngpu tags all pointer-type variadic pattern arguments with the <strong>__restrict__</strong> qualifier. __restrict__ is an assertion by the programmer that all qualified pointers reference non-overlapping memory, that is, the pointers are not <em>aliased</em>. When pointers are aliased, the compiler issues cannot re-order store instructions, and this leads to sequential dependencies which may increase latency. </p>
 <p>By tagging all pointers with __restrict__, the compiler can <em>overlap</em> loads by factoring them to the top, issuing each load before the preceding one has returned its data. Overlapping of IO increases <em>instruction-level parallelism</em> (ILP) and decreases kernel latency. </p>
 <p>In this example we call the <code>transform</code> pattern with a block size of 128 threads and a grain size of 4. That is, for a full block, 4 work-items are processed per thread. Using a large grain size opens the possibility for scheduling overlapped loads and realizing high ILP. </p>
@@ -464,7 +464,7 @@ Hello from thread 9
                                                             /* 0x001ffc00ffe100f1 */
 /*1428*/                   STG.E [R14], R12;                /* 0xeedc200000070e0c */
 </code></pre><p>This implementation differs only that the input and output parameters are passed variadically to <code>transform_lbs</code>. The compiler can now re-order the memory operations, which it does, overlapping all four loads to the input array.</p>
-<p>Always look for opportunities to overlap loads from global memory. The moderngpu patterns aggressively overlap for data generated and consumed internally, and the automatic __restrict__ promotion on variadically-passed pointer arguments allows behavior data to be similarly optimized.</p>
+<p>Always look for opportunities to overlap loads from global memory. The moderngpu patterns aggressively overlap for data generated and consumed internally, and the automatic __restrict__ promotion on variadically-passed pointer arguments allows access to behavior data to be similarly optimized.</p>
 
                     
                     </section>
