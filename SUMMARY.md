@@ -1,6 +1,6 @@
 * [Introduction](doc/intro.md)
 * [Getting started](doc/gettingstarted.md)
-* [Kernels and arguments](doc/kernels.md)
+* [Patterns and behaviors](doc/patterns.md)
 * [Patterns and specializers](doc/patterns.md)
 * [Load-balancing search](doc/lbs.md)
 * [API reference](doc/api.md)
