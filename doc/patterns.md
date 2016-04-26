@@ -135,7 +135,7 @@ Although this is a fair motivating case for the use of variadic parameters, in s
 
 ## Restricted arguments
 
-Parameters that are passed by lambda captured are handled directly by the CUDA compiler; moderngpu doesn't get its hands on those. Parameters passed variadically, however, are available for transformation by the library.
+Parameters that are passed by lambda capture are handled directly by the CUDA compiler; moderngpu doesn't get its hands on those. Parameters passed variadically, however, are available for transformation by the library.
 
 moderngpu tags all pointer-type variadic pattern arguments with the **\_\_restrict\_\_** qualifier. \_\_restrict\_\_ is an assertion by the programmer that all qualified pointers reference non-overlapping memory, that is, the pointers are not _aliased_. When pointers are aliased, the compiler issues cannot re-order store instructions, and this leads to sequential dependencies which may increase latency. 
 
